@@ -2,3 +2,6 @@ psycopg2
 python-dotenv
 ollama
 streamlit
+fastapi 
+pydantic
+uvicorn

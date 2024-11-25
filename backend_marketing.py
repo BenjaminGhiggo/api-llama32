@@ -2,6 +2,7 @@ import ollama
 import os
 import psycopg2
 from dotenv import load_dotenv
+from typing import Optional  # Asegúrate de importar Optional
 
 # Cargar variables de entorno desde .env
 load_dotenv()
@@ -14,7 +15,7 @@ def get_db_connection():
     try:
         return psycopg2.connect(
             host=os.getenv("HOST"),
-            user=os.getenv("USER"),
+            user="postgres",
             password=os.getenv("PASSWORD"),
             dbname=os.getenv("DATABASE"),
             port=os.getenv("PORT")
@@ -64,7 +65,7 @@ def get_llama_response(prompt):
         return f"Error inesperado: {e}"
 
 # Función para manejar la lógica del agente de marketing
-def marketing_agent(conversation, producto=None, objetivo=None, presupuesto=None):
+def marketing_agent(user_input: str, producto: Optional[str] = None, objetivo: Optional[str] = None, presupuesto: Optional[float] = None) -> str:
     try:
         # Establecer conexión con la base de datos
         conn = get_db_connection()
@@ -72,8 +73,6 @@ def marketing_agent(conversation, producto=None, objetivo=None, presupuesto=None
             return "Error al conectar con la base de datos."
 
         cursor = conn.cursor()
-
-        user_input = conversation[-1]['content']
 
         # Obtener datos relevantes de la base de datos
         data = query_marketing_data(user_input, cursor, producto, objetivo, presupuesto)
@@ -116,7 +115,7 @@ Respuesta del experto:
         print(f"[ERROR] Ocurrió una excepción en marketing_agent: {e}")
         return f"Error inesperado: {e}"
 
-def query_marketing_data(question, cursor, producto=None, objetivo=None, presupuesto=None):
+def query_marketing_data(question: str, cursor, producto: Optional[str] = None, objetivo: Optional[str] = None, presupuesto: Optional[float] = None) -> Optional[str]:
     try:
         if "crear" in question.lower() and "campaña de marketing" in question.lower():
             if producto and objetivo and presupuesto is not None:
@@ -142,35 +141,3 @@ def query_marketing_data(question, cursor, producto=None, objetivo=None, presupu
     except Exception as e:
         print(f"[ERROR] Ocurrió una excepción en query_marketing_data: {e}")
         return None
-
-if __name__ == "__main__":
-    # Interacción en la terminal para depuración
-    conversation = []
-    print("Agente de Marketing 📣")
-    print("Escribe 'salir' para terminar la conversación.")
-    while True:
-        user_input = input("Tú: ")
-        if user_input.lower() in ["salir", "exit", "quit"]:
-            print("Agente de Marketing: ¡Hasta luego!")
-            break
-
-        # Variables adicionales
-        producto = None
-        objetivo = None
-        presupuesto = None
-
-        if "crear" in user_input.lower() and "campaña de marketing" in user_input.lower():
-            producto = input("Ingresa el nombre de tu producto: ")
-            objetivo = input("Ingresa el objetivo de tu campaña: ")
-            while True:
-                presupuesto_input = input("Ingresa tu presupuesto: ")
-                try:
-                    presupuesto = float(presupuesto_input)
-                    break
-                except ValueError:
-                    print("Por favor, ingresa un valor numérico válido para el presupuesto.")
-
-        conversation.append({"role": "user", "content": user_input})
-        assistant_reply = marketing_agent(conversation, producto, objetivo, presupuesto)
-        print(f"Agente de Marketing: {assistant_reply}")
-        conversation.append({"role": "assistant", "content": assistant_reply})

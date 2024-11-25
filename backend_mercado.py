@@ -2,6 +2,7 @@ import ollama
 import os
 import psycopg2
 from dotenv import load_dotenv
+from typing import Optional  # Asegúrate de importar Optional
 
 # Cargar variables de entorno desde .env
 load_dotenv()
@@ -14,7 +15,7 @@ def get_db_connection():
     try:
         return psycopg2.connect(
             host=os.getenv("HOST"),
-            user=os.getenv("USER"),
+            user="postgres",
             password=os.getenv("PASSWORD"),
             dbname=os.getenv("DATABASE"),
             port=os.getenv("PORT")
@@ -64,7 +65,7 @@ def get_llama_response(prompt):
         return f"Error inesperado: {e}"
 
 # Función para manejar la lógica del agente de mercado
-def market_agent(conversation, categoria=None, ubicacion=None):
+def market_agent(user_input: str, categoria: Optional[str] = None, ubicacion: Optional[str] = None) -> str:
     try:
         # Establecer conexión con la base de datos
         conn = get_db_connection()
@@ -73,10 +74,11 @@ def market_agent(conversation, categoria=None, ubicacion=None):
 
         cursor = conn.cursor()
 
-        user_input = conversation[-1]['content']
-
         # Obtener datos relevantes de la base de datos
         data = query_market_data(user_input, cursor, categoria, ubicacion)
+
+        # Imprimir los datos obtenidos para depuración
+        print(f"[DEBUG] Datos obtenidos de la base de datos: {data}")
 
         # Cerrar la conexión a la base de datos
         cursor.close()
@@ -109,6 +111,9 @@ Proporciona una respuesta concisa y práctica, limitada a un máximo de 3 párra
 Respuesta del analista:
 """
 
+        # Imprimir el prompt construido para depuración
+        print(f"[DEBUG] Prompt construido:\n{prompt}")
+
         # Obtener respuesta del modelo
         assistant_reply = get_llama_response(prompt)
         return assistant_reply
@@ -116,8 +121,9 @@ Respuesta del analista:
         print(f"[ERROR] Ocurrió una excepción en market_agent: {e}")
         return f"Error inesperado: {e}"
 
-def query_market_data(question, cursor, categoria=None, ubicacion=None):
+def query_market_data(question: str, cursor, categoria: Optional[str] = None, ubicacion: Optional[str] = None) -> Optional[str]:
     try:
+        # Verificar si la pregunta contiene "precio promedio" y "producto similar"
         if "precio promedio" in question.lower() and "producto similar" in question.lower():
             if categoria:
                 cursor.execute("""
@@ -128,9 +134,12 @@ def query_market_data(question, cursor, categoria=None, ubicacion=None):
                 if avg_price:
                     return f"El precio promedio de productos similares en la categoría '{categoria}' es ${avg_price:.2f}."
                 else:
+                    print("[DEBUG] No se encontraron precios promedio para la categoría proporcionada.")
                     return None
             else:
+                print("[DEBUG] 'categoria' no proporcionada en la solicitud.")
                 return None
+        # Verificar si la pregunta contiene "competitivo" y "mi zona"
         elif "competitivo" in question.lower() and "mi zona" in question.lower():
             if ubicacion:
                 cursor.execute("""
@@ -140,7 +149,9 @@ def query_market_data(question, cursor, categoria=None, ubicacion=None):
                 competitors = cursor.fetchone()[0]
                 return f"En tu zona ({ubicacion}), hay {competitors} competidores en tu categoría de producto."
             else:
+                print("[DEBUG] 'ubicacion' no proporcionada en la solicitud.")
                 return None
+        # Verificar si la pregunta contiene "mercados internacionales" e "interesados"
         elif "mercados internacionales" in question.lower() and "interesados" in question.lower():
             cursor.execute("""
                 SELECT mercados_internacionales FROM agente_mercado;
@@ -152,34 +163,11 @@ def query_market_data(question, cursor, categoria=None, ubicacion=None):
                     mercados.update(map(str.strip, row[0].split(",")))
                 return f"Mercados internacionales potenciales: {', '.join(mercados)}."
             else:
+                print("[DEBUG] No se encontraron mercados internacionales en la base de datos.")
                 return None
         else:
+            print("[DEBUG] La pregunta no coincide con ninguna consulta predefinida.")
             return None
     except Exception as e:
         print(f"[ERROR] Ocurrió una excepción en query_market_data: {e}")
         return None
-
-if __name__ == "__main__":
-    # Interacción en la terminal para depuración
-    conversation = []
-    print("Agente de Mercado 📊")
-    print("Escribe 'salir' para terminar la conversación.")
-    while True:
-        user_input = input("Tú: ")
-        if user_input.lower() in ["salir", "exit", "quit"]:
-            print("Agente de Mercado: ¡Hasta luego!")
-            break
-
-        # Variables adicionales
-        categoria = None
-        ubicacion = None
-
-        if "precio promedio" in user_input.lower() and "producto similar" in user_input.lower():
-            categoria = input("Ingresa la categoría de tu producto: ")
-        if "competitivo" in user_input.lower() and "mi zona" in user_input.lower():
-            ubicacion = input("Ingresa tu ubicación geográfica: ")
-
-        conversation.append({"role": "user", "content": user_input})
-        assistant_reply = market_agent(conversation, categoria, ubicacion)
-        print(f"Agente de Mercado: {assistant_reply}")
-        conversation.append({"role": "assistant", "content": assistant_reply})

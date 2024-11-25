@@ -1,3 +1,5 @@
+# backend_financiero.py
+
 import ollama
 import os
 import psycopg2
@@ -14,7 +16,7 @@ def get_db_connection():
     try:
         return psycopg2.connect(
             host=os.getenv("HOST"),
-            user=os.getenv("USER"),
+            user="postgres",
             password=os.getenv("PASSWORD"),
             dbname=os.getenv("DATABASE"),
             port=os.getenv("PORT")
@@ -67,14 +69,20 @@ def get_llama_response(prompt):
 # Función para manejar la lógica del agente financiero
 def financial_agent(conversation):
     try:
+        # Verificar si 'conversation' es una cadena de texto
+        if isinstance(conversation, str):
+            # Convertir la cadena en una lista de diccionarios
+            conversation = [{"role": "user", "content": conversation}]
+        
+        # Ahora, 'conversation' es una lista de diccionarios
+        user_input = conversation[-1]['content']
+
         # Establecer conexión con la base de datos
         conn = get_db_connection()
         if not conn:
             return "Error al conectar con la base de datos."
 
         cursor = conn.cursor()
-
-        user_input = conversation[-1]['content']
 
         # Obtener datos relevantes de la base de datos
         data = query_financial_data(user_input, cursor)

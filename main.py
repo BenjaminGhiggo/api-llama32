@@ -4,8 +4,8 @@ from pydantic import BaseModel
 from backend_financiero import financial_agent
 from backend_marketing import marketing_agent
 from backend_mercado import market_agent
-from typing import Optional
-
+from typing import Optional  # Asegúrate de que este import esté presente
+from pydantic import BaseModel
 # Crear instancia de FastAPI
 app = FastAPI(title="API de Agentes", version="1.0")
 
